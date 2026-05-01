@@ -1,0 +1,168 @@
+# ============================================================
+# DOCKER COMPOSE CONFIGURATION
+# ============================================================
+# Docker Compose lets you define and run multiple containers.
+# This file defines our entire application stack:
+# - postgres: Database
+# - localstack: S3 emulation for file uploads
+# - backend: FastAPI server
+# - frontend: SvelteKit server
+#
+# To start everything: docker-compose up
+# To rebuild and start: docker-compose up --build
+# To stop: docker-compose down
+# To stop and remove data: docker-compose down -v
+# ============================================================
+
+services:
+  # ----------------------------------------------------------
+  # PostgreSQL Database
+  # ----------------------------------------------------------
+  # This runs PostgreSQL in a container instead of installing it locally.
+  # Data persists in a Docker volume (survives container restarts).
+  postgres:
+    image: postgres:16-alpine  # Alpine = smaller image
+    container_name: lablenz-db
+    
+    # Environment variables configure PostgreSQL
+    environment:
+      POSTGRES_USER: lablenz_user
+      POSTGRES_PASSWORD: lablenz_password
+      POSTGRES_DB: lablenz_db
+    
+    # Port mapping: host:container
+    # Access at localhost:5432 from your machine
+    ports:
+      - "5432:5432"
+    
+    # Named volume for data persistence
+    # Without this, data would be lost when container stops
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    
+    # Health check - other services wait for postgres to be ready
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lablenz_user -d lablenz_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------
+  # LocalStack (S3 Emulation)
+  # ----------------------------------------------------------
+  # LocalStack emulates AWS services locally.
+  # We use it for S3 (file storage) without needing a real AWS account.
+  localstack:
+    image: localstack/localstack:latest
+    container_name: lablenz-localstack
+    
+    environment:
+      # Only run the S3 service
+      SERVICES: s3
+      # Default region
+      AWS_DEFAULT_REGION: us-east-1
+    
+    ports:
+      # LocalStack runs on port 4566
+      - "4566:4566"
+    
+    # Persist S3 data in a volume
+    volumes:
+      - localstack_data:/var/lib/localstack
+
+  # ----------------------------------------------------------
+  # Backend (FastAPI)
+  # ----------------------------------------------------------
+  backend:
+    # Build from the backend directory
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    
+    container_name: lablenz-backend
+    
+    # Environment variables for the app
+    # These override the .env file
+    environment:
+      # Database connection (postgres is the service name, Docker resolves it)
+      DATABASE_URL: postgresql://lablenz_user:lablenz_password@postgres:5432/lablenz_db
+      
+      # Security (use a real secret in production!)
+      SECRET_KEY: your-super-secret-key-change-in-production
+      
+      # CORS - allow frontend origin
+      CORS_ORIGINS: '["http://localhost:3000", "http://frontend:3000"]'
+      
+      # S3 / LocalStack configuration
+      S3_BUCKET_NAME: lablenz-images
+      S3_ENDPOINT_URL: http://localstack:4566
+      S3_ACCESS_KEY: test
+      S3_SECRET_KEY: test
+      S3_REGION: us-east-1
+      
+      # Stripe (set these in .env for real values)
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
+      
+      # Email (set these in .env for real values)
+      RESEND_API_KEY: ${RESEND_API_KEY:-re_placeholder}
+      
+      # Frontend URL for email links
+      FRONTEND_URL: http://localhost:3000
+    
+    ports:
+      - "8000:8000"
+    
+    # Wait for postgres and localstack to be healthy before starting
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_started
+    
+    # Health check using our /health endpoint
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ----------------------------------------------------------
+  # Frontend (SvelteKit)
+  # ----------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    
+    container_name: lablenz-frontend
+    
+    environment:
+      # SvelteKit needs ORIGIN for CSRF protection
+      ORIGIN: http://localhost:3000
+      
+      # Backend API URL (used by SvelteKit server-side code)
+      # From frontend container, backend is accessible via service name
+      API_BASE_URL: http://backend:8000
+      
+      # Public API URL (used by browser JavaScript)
+      # Browser can't resolve 'backend', so use localhost
+      PUBLIC_API_URL: http://localhost:8000
+    
+    ports:
+      - "3000:3000"
+    
+    # Wait for backend to be healthy
+    depends_on:
+      backend:
+        condition: service_healthy
+
+# ----------------------------------------------------------
+# Volumes
+# ----------------------------------------------------------
+# Named volumes persist data between container restarts.
+# Run 'docker-compose down -v' to delete them.
+volumes:
+  postgres_data:
+  localstack_data:
