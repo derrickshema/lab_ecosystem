@@ -1,0 +1,26 @@
+# Dependencies (installed fresh in each stage)
+node_modules/
+
+# Build output (produced inside the image)
+build/
+.svelte-kit/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Environment files
+.env
+.env.*
+
+# Development files
+*.md
+*.log
+
+# Cache
+.npm/
+.pnpm-store/

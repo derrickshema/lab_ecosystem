@@ -1,0 +1,32 @@
+# Virtual environment (created fresh inside the image)
+venv/
+.venv/
+__pycache__/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Environment files (secrets passed via docker-compose environment:)
+.env
+.env.*
+
+# Tests (not needed in production image)
+tests/
+pytest.ini
+.pytest_cache/
+
+# Development files
+*.md
+*.log
+
+# Python cache
+*.pyc
+*.pyo
+*.pyd
+migrations/__pycache__/
+migrations/versions/__pycache__/

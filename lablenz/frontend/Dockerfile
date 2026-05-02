@@ -13,9 +13,7 @@
 # ------------------------------------------------------------
 FROM node:22-slim AS deps
 
-# Enable corepack for pnpm (Node's built-in package manager manager)
-# This lets us use pnpm without installing it globally
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN npm install -g pnpm
 
 WORKDIR /app
 
@@ -29,14 +27,12 @@ RUN pnpm install --frozen-lockfile
 # ------------------------------------------------------------
 # STAGE 2: Builder
 # ------------------------------------------------------------
-FROM node:22-slim AS builder
-
-RUN corepack enable && corepack prepare pnpm@latest --activate
+FROM deps AS builder
 
 WORKDIR /app
 
 # Copy dependencies from the deps stage
-COPY --from=deps /app/node_modules ./node_modules
+# COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Build the SvelteKit app
