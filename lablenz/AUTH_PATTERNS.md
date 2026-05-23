@@ -144,6 +144,73 @@ class TokenData(BaseModel):
 
 ---
 
+## JWT (`security/jwt.py`)
+
+### Library: PyJWT (not python-jose)
+`python-jose` has active CVEs (CVE-2024-33664, CVE-2024-33663 — algorithm confusion attacks) and is barely maintained since 2022. Use `PyJWT`:
+```python
+import jwt
+from jwt import InvalidTokenError  # catches all decode failures
+```
+
+### Every token must carry these claims
+| Claim | Purpose |
+|---|---|
+| `exp` | Expiry — required |
+| `iat` | Issued-at — useful for audit logs and "issued after logout" checks |
+| `jti` | Unique UUID — enables individual token revocation/blacklisting |
+| `token_type` | `"access"`, `"refresh"`, or `"password_reset"` — prevents cross-type abuse |
+
+```python
+import uuid
+to_encode.update({
+    "exp": expire,
+    "iat": datetime.now(timezone.utc),
+    "jti": str(uuid.uuid4()),
+    "token_type": "access",  # or "refresh" / "password_reset"
+})
+```
+
+### Always validate token_type on decode
+```python
+payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+if payload.get("token_type") != "access":
+    raise HTTPException(401, "Invalid token type", headers={"WWW-Authenticate": "Bearer"})
+```
+This prevents a refresh token being submitted where an access token is expected and vice versa.
+
+### Function inventory
+```python
+create_access_token(data, expires_delta=None) -> str
+decode_access_token(token) -> dict          # raises HTTPException on failure
+
+create_refresh_token(data, expires_delta=None) -> str
+decode_refresh_token(token) -> dict         # raises HTTPException on failure
+
+create_password_reset_token(email) -> str
+verify_password_reset_token(token) -> str | None  # returns None on failure (not exception)
+```
+
+`decode_*` raises `HTTPException` — used in protected endpoints.
+`verify_password_reset_token` returns `None` — used in the reset route where you control the error response.
+
+### Exception handling
+`InvalidTokenError` catches the full PyJWT hierarchy: expired, invalid signature, malformed, wrong algorithm — everything needed in one except clause.
+
+### All expiry settings belong in config
+```python
+# config.py
+ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30
+```
+Never hardcode expiry values in `jwt.py`.
+
+### jti and token revocation
+With `jti` on every token you can implement a denylist (Redis or DB table) to invalidate individual tokens on logout or after a password change — without rotating the secret key. Without `jti`, the only way to invalidate a token is to rotate `SECRET_KEY`, which logs out every user.
+
+---
+
 ## Login Flow Options
 
 ### Option A: JSON body (natural for SPAs / SvelteKit)
@@ -174,6 +241,58 @@ No `UserLogin` class needed. Gives free Swagger "Authorize" button.
 - `OrgRole` — role within an organisation/facility context
 - Both stored in JWT via `TokenData` to avoid DB lookups per request
 - `facility_id` in token enables scoped data access without extra queries
+
+---
+
+## Password Hashing (`security/passwords.py`)
+
+### Algorithm: Argon2id (not bcrypt)
+Argon2id is OWASP's first-choice algorithm (winner of Password Hashing Competition 2015). bcrypt is still acceptable but second-best.
+
+```python
+# pip install argon2-cffi
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(
+    schemes=["argon2"],
+    deprecated="auto",        # string, NOT ["auto"] — list form is incorrect API usage
+    argon2__time_cost=3,       # iterations
+    argon2__memory_cost=65536, # 64 MiB — OWASP recommended
+    argon2__parallelism=4,
+)
+```
+
+### Three functions — cover all use cases
+```python
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def needs_rehash(hashed_password: str) -> bool:
+    """True if hash was created with weaker parameters than current config."""
+    return pwd_context.needs_update(hashed_password)
+```
+
+### Silent rehash on login (use needs_rehash)
+The only moment you have the plain password is during login. Use it to silently upgrade stale hashes:
+```python
+if needs_rehash(user.hashed_password):
+    user.hashed_password = hash_password(credentials.password)
+    session.add(user)
+    session.commit()
+```
+This ensures all active users are gradually upgraded whenever work factors are increased — transparent to the user.
+
+### Argon2 OWASP parameters
+- `time_cost=3` — iterations (minimum 1, recommended ≥2)
+- `memory_cost=65536` — 64 MiB (OWASP recommended; minimum is 19456 / 19 MiB)
+- `parallelism=4` — parallel threads
+- If server is memory-constrained, use `memory_cost=19456, time_cost=2, parallelism=1` as minimum
+
+### passlib note
+passlib has had limited maintenance since ~2021. It still works correctly. Monitor for updates; `argon2-cffi` directly is an alternative if passlib is ever abandoned.
 
 ---
 
