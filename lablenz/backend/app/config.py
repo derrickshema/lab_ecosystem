@@ -71,6 +71,12 @@ class Settings(BaseSettings):
     
     # How long access tokens are valid (in minutes)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # How long refresh tokens are valid (in minutes) — default 7 days
+    REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
+
+    # How long password reset tokens are valid (in minutes)
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30
     
     # =========================================================================
     # Application Settings
