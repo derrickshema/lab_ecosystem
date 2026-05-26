@@ -159,7 +159,7 @@ from jwt import InvalidTokenError  # catches all decode failures
 | `exp` | Expiry — required |
 | `iat` | Issued-at — useful for audit logs and "issued after logout" checks |
 | `jti` | Unique UUID — enables individual token revocation/blacklisting |
-| `token_type` | `"access"`, `"refresh"`, or `"password_reset"` — prevents cross-type abuse |
+| `token_type` | `"access"`, `"refresh"`, `"password_reset"`, `"facility_selection"` — prevents cross-type abuse |
 
 ```python
 import uuid
@@ -182,13 +182,16 @@ This prevents a refresh token being submitted where an access token is expected 
 ### Function inventory
 ```python
 create_access_token(data, expires_delta=None) -> str
-decode_access_token(token) -> dict          # raises HTTPException on failure
+decode_access_token(token) -> dict                    # raises HTTPException on failure
 
 create_refresh_token(data, expires_delta=None) -> str
-decode_refresh_token(token) -> dict         # raises HTTPException on failure
+decode_refresh_token(token) -> dict                   # raises HTTPException on failure
 
 create_password_reset_token(email) -> str
-verify_password_reset_token(token) -> str | None  # returns None on failure (not exception)
+verify_password_reset_token(token) -> str | None      # returns None on failure (not exception)
+
+create_facility_selection_token(user_id) -> str       # 5-min, token_type="facility_selection"
+decode_facility_selection_token(token) -> int         # returns user_id; raises HTTPException on failure
 ```
 
 `decode_*` raises `HTTPException` — used in protected endpoints.
@@ -219,8 +222,8 @@ class UserLogin(BaseModel):
     username: str = Field(max_length=50)
     password: str = Field(max_length=255)  # max only, not min
 
-@router.post("/login", response_model=Token)
-async def login(credentials: UserLogin, session: Session = Depends(get_session)):
+@router.post("/login", response_model=Token | TenantSelectionRequired)
+def login(body: UserLogin, response: Response, session: Session = Depends(get_session)):
     ...
 ```
 
@@ -234,13 +237,32 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 ```
 No `UserLogin` class needed. Gives free Swagger "Authorize" button.
 
+### Multi-tenant context login
+When a user belongs to more than one active tenant/organisation, login does not issue tokens immediately. Instead it returns a context picker response:
+```python
+class TenantSelectionRequired(BaseModel):
+    selection_required: Literal[True] = True
+    tenants: list[TenantOption]    # [{tenant_id, tenant_name, org_role}]
+    selection_token: str           # 5-min JWT, token_type="facility_selection"
+```
+The client renders a picker and POSTs to `POST /auth/tenant-select` with `{tenant_id, selection_token}`. Full tokens are issued only after that confirmation.
+
+See [MULTI_TENANCY.md](MULTI_TENANCY.md) for the full flow.
+
+### Token transport: httpOnly cookies + JSON body
+Tokens are returned in both the JSON response body **and** set as httpOnly cookies. Cookie takes priority in `get_token_from_cookie_or_header`. The refresh token cookie is scoped to `path="/auth/refresh"` to minimise its exposure surface.
+
 ---
 
 ## RBAC Notes
-- `SystemRole` — global system-level role (e.g., SUPERADMIN, ADMIN, USER)
-- `OrgRole` — role within an organisation/facility context
-- Both stored in JWT via `TokenData` to avoid DB lookups per request
-- `facility_id` in token enables scoped data access without extra queries
+
+> Full detail in [RBAC_PATTERNS.md](RBAC_PATTERNS.md).
+
+- `SystemRole` — global system-level role, stored on `User.role` (DB), checked against live DB value
+- `OrgRole` — tenant/org-scoped role, stored on the access grant table (e.g. `UserFacility.org_role`), carried in JWT claim
+- Both in `TokenData` — JWT decoded once per request; FastAPI caches `get_token_data` result
+- `facility_id` in token scopes all data queries without extra joins
+- Never read `org_role` from `User` — it doesn't exist there; always read from `TokenData`
 
 ---
 
