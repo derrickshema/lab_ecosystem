@@ -106,3 +106,40 @@ def verify_password_reset_token(token: str) -> str | None:
         return payload.get("sub")
     except InvalidTokenError:
         return None
+
+
+# --- Facility Selection Tokens ---
+
+def create_facility_selection_token(user_id: int) -> str:
+    """
+    Short-lived (5 min) token for multi-facility users.
+    Carries only user_id; the client POSTs it back with the chosen facility_id.
+    """
+    expire = datetime.now(timezone.utc) + timedelta(minutes=5)
+    to_encode = {
+        "sub": str(user_id),
+        "token_type": "facility_selection",
+        "jti": str(uuid.uuid4()),
+        "iat": datetime.now(timezone.utc),
+        "exp": expire,
+    }
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def decode_facility_selection_token(token: str) -> int:
+    """Verify a facility selection token and return the user_id (int)."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("token_type") != "facility_selection":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return int(payload["sub"])
+    except (InvalidTokenError, KeyError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired selection token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )

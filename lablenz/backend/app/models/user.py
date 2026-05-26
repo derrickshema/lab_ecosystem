@@ -1,12 +1,14 @@
 from datetime import datetime, timezone
-from enum import Enum
 import re
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, field_validator
-from sqlalchemy import DateTime, func
+from sqlalchemy import DateTime, Enum as SAEnum, func
 from sqlmodel import Column, Field, SQLModel
 
-from lablenz.backend.app.models.enums import OrgRole, SystemRole
+from .enums import OrgRole, SystemRole
+
+from .enums import OrgRole, SystemRole
 
 
 class UserBase(SQLModel):
@@ -15,7 +17,7 @@ class UserBase(SQLModel):
     last_name: str = Field(max_length=50)
     username: str = Field(index=True, unique=True, max_length=50, description="Unique username for the user")
     email: EmailStr = Field(index=True, unique=True, max_length=100, description="User's email address")
-    role: SystemRole = Field(default=SystemRole.USER, sa_column = Column(Enum(SystemRole, name="system_role", create_type=True)), description="System role assigned to the user")
+    role: SystemRole = Field(default=SystemRole.USER, sa_column=Column(SAEnum(SystemRole, name="system_role", create_type=True)), description="System role assigned to the user")
 
     @field_validator("username")
     def validate_username(cls, value: str) -> str:
@@ -36,8 +38,11 @@ class User(UserBase, table=True):
 
 class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=255, description="Password for the user (will be hashed before storage)")
-    org_role: OrgRole|None = Field(default=None, description="Organization role assigned to the user (optional)")
-    facility_id: int|None = Field(default=None, description="ID of the facility the user is associated with (optional)")
+    org_role: OrgRole | None = Field(default=None, description="Organisation role for the initial facility assignment")
+    facility_id: int | None = Field(default=None, description="Facility for the initial UserFacility assignment")
+    # Lock role to USER — privilege escalation via the create endpoint is not allowed.
+    # Elevating to SUPER_ADMIN is a separate admin-only operation.
+    role: Literal[SystemRole.USER] = SystemRole.USER
 
     @field_validator("password")
     def validate_password(cls, value: str) -> str:
@@ -63,18 +68,19 @@ class UserUpdate(BaseModel):
     last_name: str | None = Field(default=None, max_length=50)
     username: str | None = Field(default=None, max_length=50, description="Unique username for the user")
     email: EmailStr | None = Field(default=None, max_length=100, description="User's email address")
-    role: SystemRole | None = Field(default=None, description="System role assigned to the user")
-    org_role: OrgRole|None = Field(default=None, description="Organization role assigned to the user (optional)")
-    facility_id: int|None = Field(default=None, description="ID of the facility the user is associated with (optional)")
 
     @field_validator("username")
-    def validate_username(cls, value: str) -> str:
+    def validate_username(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         if not re.match(r"^[a-zA-Z0-9_.-]+$", value):
             raise ValueError("Username can only contain letters, numbers, underscores, hyphens, and periods.")
         return value.lower()  # Normalize to lowercase for consistency
     
     @field_validator("email")
-    def validate_email(cls, value: str) -> str:
+    def validate_email(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         return value.lower()
     
 class UserLogin(BaseModel):
@@ -137,3 +143,25 @@ class UserEmailVerification(BaseModel):
 
 class UserEmailVerificationConfirm(BaseModel):
     token: str = Field(description="Email verification token sent to the user's email")
+
+
+# --- Multi-facility login schemas ---
+
+class FacilityOption(BaseModel):
+    """A facility + role assignment returned when a user has multiple active contexts."""
+    facility_id: int
+    facility_name: str
+    org_role: OrgRole
+
+
+class FacilitySelectionRequired(BaseModel):
+    """Login response when the user has more than one active UserFacility assignment."""
+    selection_required: Literal[True] = True
+    facilities: list[FacilityOption]
+    selection_token: str = Field(description="Short-lived token used to complete facility selection")
+
+
+class FacilitySelect(BaseModel):
+    """Request body for POST /auth/facility-select."""
+    facility_id: int
+    selection_token: str

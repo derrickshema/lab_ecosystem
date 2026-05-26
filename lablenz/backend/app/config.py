@@ -106,7 +106,7 @@ class Settings(BaseSettings):
     # In production, use real AWS S3 or another S3-compatible service
     
     S3_ENDPOINT_URL: Optional[str] = "http://localhost:4566"  # LocalStack URL
-    S3_BUCKET_NAME: str = "recipe-images"
+    S3_BUCKET_NAME: str = "lablenz-files"  # TODO: set via env var in production
     AWS_ACCESS_KEY_ID: str = "test"  # LocalStack doesn't check these
     AWS_SECRET_ACCESS_KEY: str = "test"
     AWS_REGION: str = "us-east-1"

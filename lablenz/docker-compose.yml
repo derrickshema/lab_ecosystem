@@ -110,7 +110,19 @@ services:
       
       # Frontend URL for email links
       FRONTEND_URL: http://localhost:3000
+
+      DEBUG: "true"
     
+    volumes:
+      # Mount source code so alembic migrations and code changes are
+      # written back to the host filesystem. The venv lives at /opt/venv
+      # (not /app) so it is NOT overridden by this mount.
+      - ./backend:/app
+
+    # Override CMD to enable hot-reload in development.
+    # Remove --reload when deploying to production.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
     ports:
       - "8000:8000"
     
