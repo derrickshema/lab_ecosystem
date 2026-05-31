@@ -50,7 +50,7 @@ from ..security.jwt import (
     verify_password_reset_token,
     verify_email_verification_token,
 )
-from ..security.passwords import hash_password, verify_password
+from ..security.passwords import hash_password, needs_rehash, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -149,6 +149,11 @@ def login(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    if needs_rehash(user.hashed_password):
+        user.hashed_password = hash_password(body.password)
+        session.add(user)
+        session.commit()
 
     # 2. Check facility assignments
     assignments = _get_active_assignments(user.id, session)  # type: ignore[arg-type]

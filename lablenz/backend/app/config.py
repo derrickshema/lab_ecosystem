@@ -39,7 +39,6 @@ USAGE
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
-from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -108,7 +107,7 @@ class Settings(BaseSettings):
     # For local development, we use LocalStack (fake AWS)
     # In production, use real AWS S3 or another S3-compatible service
     
-    S3_ENDPOINT_URL: Optional[str] = "http://localhost:4566"  # LocalStack URL
+    S3_ENDPOINT_URL: str | None = "http://localhost:4566"  # LocalStack URL
     S3_BUCKET_NAME: str = "lablenz-files"  # TODO: set via env var in production
     AWS_ACCESS_KEY_ID: str = "test"  # LocalStack doesn't check these
     AWS_SECRET_ACCESS_KEY: str = "test"
@@ -118,7 +117,7 @@ class Settings(BaseSettings):
     # Email Configuration (Resend)
     # =========================================================================
     # Get your API key from https://resend.com/api-keys
-    RESEND_API_KEY: Optional[str] = None  # Optional for local dev
+    RESEND_API_KEY: str | None = None  # Optional for local dev
     FROM_EMAIL: str = "onboarding@resend.dev"
     
     # =========================================================================
@@ -126,10 +125,10 @@ class Settings(BaseSettings):
     # =========================================================================
     # Get your keys from https://dashboard.stripe.com/test/apikeys
     # sk_test_xxx for testing, sk_live_xxx for production
-    STRIPE_SECRET_KEY: Optional[str] = None  # Optional for local dev
+    STRIPE_SECRET_KEY: str | None = None  # Optional for local dev
     
     # Webhook signing secret from `stripe listen` or Stripe Dashboard
-    STRIPE_WEBHOOK_SECRET: Optional[str] = None  # Optional for local dev
+    STRIPE_WEBHOOK_SECRET: str | None = None  # Optional for local dev
     
     # =========================================================================
     # Pydantic Settings Configuration
