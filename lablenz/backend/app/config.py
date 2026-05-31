@@ -77,6 +77,9 @@ class Settings(BaseSettings):
 
     # How long password reset tokens are valid (in minutes)
     PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # How long email verification tokens are valid (in minutes) — default 24 hours
+    EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     
     # =========================================================================
     # Application Settings

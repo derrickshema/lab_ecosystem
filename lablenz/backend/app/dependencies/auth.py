@@ -9,7 +9,8 @@ from fastapi import Depends, HTTPException, status, Request
 from sqlmodel import Session
 
 from ..db.session import get_session
-from ..models.user import TokenData, User
+from ..models.auth import TokenData
+from ..models.user import User
 from ..security.jwt import decode_access_token
 from fastapi.security import OAuth2PasswordBearer
 

@@ -19,34 +19,38 @@ Token transport: tokens are returned in the JSON body AND set as httpOnly
 cookies (Secure in production) so both SPA and server-side rendering work.
 """
 
-from datetime import timedelta
-
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlmodel import Session, select
 
 from ..config import settings
 from ..db.session import get_session
 from ..dependencies.auth import COOKIE_NAME, get_token_data
-from ..models.enums import OrgRole
-from ..models.facility import Facility, UserFacility
-from ..models.user import (
+from ..integrations.email import send_password_reset_email, send_verification_email
+from ..models.auth import (
     FacilityOption,
     FacilitySelect,
     FacilitySelectionRequired,
     RefreshToken,
     Token,
-    TokenData,
-    User,
+    UserEmailVerificationConfirm,
     UserLogin,
+    UserPasswordReset,
+    UserPasswordResetConfirm,
 )
+from ..models.facility import Facility, UserFacility
+from ..models.user import User
 from ..security.jwt import (
     create_access_token,
+    create_email_verification_token,
     create_facility_selection_token,
     create_refresh_token,
     decode_facility_selection_token,
     decode_refresh_token,
+    create_password_reset_token,
+    verify_password_reset_token,
+    verify_email_verification_token,
 )
-from ..security.passwords import verify_password
+from ..security.passwords import hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -263,3 +267,104 @@ def logout(response: Response) -> None:
     """Clear auth cookies. Clients should also discard stored tokens."""
     response.delete_cookie(key=COOKIE_NAME, httponly=True, samesite="lax")
     response.delete_cookie(key="refresh_token", httponly=True, samesite="lax", path="/auth/refresh")
+
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+def forgot_password(
+    body: UserPasswordReset,
+    session: Session = Depends(get_session),
+) -> dict:
+    """
+    Request a password reset link.
+
+    Always returns 200 regardless of whether the email is registered to
+    prevent user enumeration.
+    """
+    user = session.exec(select(User).where(User.email == body.email.lower())).first()
+    if user:
+        token = create_password_reset_token(user.email)
+        send_password_reset_email(to_email=user.email, token=token)
+    return {"message": "If that email is registered, a reset link has been sent."}
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+def reset_password(
+    body: UserPasswordResetConfirm,
+    session: Session = Depends(get_session),
+) -> None:
+    """
+    Complete a password reset using the token emailed to the user.
+    """
+    email = verify_password_reset_token(body.token)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired password reset token",
+        )
+
+    user = session.exec(select(User).where(User.email == email)).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired password reset token",
+        )
+
+    user.hashed_password = hash_password(body.new_password)
+    session.add(user)
+    session.commit()
+
+
+@router.post("/verify-email/send", status_code=status.HTTP_200_OK)
+def send_email_verification(
+    token_data=Depends(get_token_data),
+    session: Session = Depends(get_session),
+) -> dict:
+    """
+    Send (or resend) an email verification link to the authenticated user.
+    Requires a valid access token; the email address is taken from the user record.
+    """
+    user = session.get(User, token_data.user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email address is already verified",
+        )
+
+    token = create_email_verification_token(user.email)
+    send_verification_email(to_email=user.email, token=token)
+    return {"message": "Verification email sent."}
+
+
+@router.post("/verify-email/confirm", status_code=status.HTTP_200_OK)
+def confirm_email_verification(
+    body: UserEmailVerificationConfirm,
+    session: Session = Depends(get_session),
+) -> dict:
+    """
+    Confirm email ownership using the token from the verification email.
+    No authentication required — the token itself is the credential.
+    """
+    email = verify_email_verification_token(body.token)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired email verification token",
+        )
+
+    user = session.exec(select(User).where(User.email == email)).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired email verification token",
+        )
+
+    if user.email_verified:
+        return {"message": "Email address is already verified."}
+
+    user.email_verified = True
+    session.add(user)
+    session.commit()
+    return {"message": "Email address verified successfully."}

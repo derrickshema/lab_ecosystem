@@ -8,7 +8,8 @@ Use these dependencies as route guards after get_current_user has established id
 from fastapi import Depends, HTTPException, status
 
 from ..models.enums import OrgRole, SystemRole
-from ..models.user import TokenData, User
+from ..models.auth import TokenData
+from ..models.user import User
 from .auth import get_current_user, get_token_data, get_verified_user
 
 

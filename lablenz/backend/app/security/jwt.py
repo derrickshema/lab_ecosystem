@@ -143,3 +143,31 @@ def decode_facility_selection_token(token: str) -> int:
             detail="Invalid or expired selection token",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+# --- Email Verification Tokens ---
+
+def create_email_verification_token(email: str) -> str:
+    """Create a short-lived JWT token for email address verification."""
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES
+    )
+    to_encode = {
+        "sub": email,
+        "token_type": "email_verification",
+        "jti": str(uuid.uuid4()),
+        "iat": datetime.now(timezone.utc),
+        "exp": expire,
+    }
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def verify_email_verification_token(token: str) -> str | None:
+    """Verify an email verification token and return the email, or None if invalid."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("token_type") != "email_verification":
+            return None
+        return payload.get("sub")
+    except InvalidTokenError:
+        return None
