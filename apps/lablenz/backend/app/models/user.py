@@ -30,7 +30,7 @@ class UserBase(SQLModel):
 class User(UserBase, table=True):
     id: int|None = Field(default=None, primary_key=True)
     hashed_password: str = Field(max_length=255, description="Hashed password for the user")
-    email_verified: bool = Field(default=False, description="Indicates whether the user's email has been verified")
+    account_active: bool = Field(default=False, description="Indicates whether the user's email has been verified")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), sa_column=Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=func.now()), description="Timestamp when the user was created")
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), sa_column=Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=func.now(), onupdate=lambda: datetime.now(timezone.utc)), description="Timestamp when the user was last updated")
 
@@ -57,7 +57,7 @@ class UserCreate(UserBase):
 
 class UserRead(UserBase):
     id: int
-    email_verified: bool
+    account_active: bool
     created_at: datetime
     updated_at: datetime
 
