@@ -1,0 +1,86 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: myapp-db
+    environment:
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: app_password
+      POSTGRES_DB: app_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_user -d app_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # LocalStack — emulates AWS S3 locally (no real AWS account needed)
+  localstack:
+    image: localstack/localstack:latest
+    container_name: myapp-localstack
+    environment:
+      SERVICES: s3
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+
+  # Backend (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: myapp-backend
+    environment:
+      # Use the service name 'postgres', not localhost
+      DATABASE_URL: postgresql+psycopg2://app_user:app_password@postgres:5432/app_db
+      SECRET_KEY: your-super-secret-key-change-in-production
+      CORS_ORIGINS: '["http://localhost:3000", "http://frontend:3000"]'
+      S3_BUCKET_NAME: myapp-uploads
+      S3_ENDPOINT_URL: http://localstack:4566
+      S3_ACCESS_KEY: test
+      S3_SECRET_KEY: test
+      S3_REGION: us-east-1
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
+      RESEND_API_KEY: ${RESEND_API_KEY:-re_placeholder}
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend (SvelteKit)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: myapp-frontend
+    environment:
+      ORIGIN: http://localhost:3000
+      # Internal: SvelteKit server-side code uses the service name
+      API_BASE_URL: http://backend:8000
+      # Public: browser JS uses localhost (can't resolve 'backend')
+      PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  localstack_data:

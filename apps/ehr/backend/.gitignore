@@ -1,0 +1,22 @@
+# ── Environment variables ─────────────────────────────────────
+# Block ALL .env* files by default...
+.env
+.env.*
+# ...but allow the committed example templates
+!**/.env.example
+!**/.env.test
+
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# ── Node ──────────────────────────────────────────────────────
+node_modules/
+.svelte-kit/
+/frontend/build/
+
+# ── OS ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
