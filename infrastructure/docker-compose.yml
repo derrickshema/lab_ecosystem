@@ -1,0 +1,40 @@
+# Shared local infrastructure for every app in the ecosystem.
+# Start this first, then start any app's own docker-compose.
+#
+#   docker compose up -d      # start (leave it running)
+#   docker compose down       # stop (data is kept)
+#   docker compose down -v    # stop AND delete all databases
+
+services:
+  # One PostgreSQL server; each app gets its own database and user on it.
+  # The databases and users are created by initdb/01-create-app-databases.sql.
+  postgres:
+    image: postgres:16-alpine
+    container_name: lab-postgres
+    environment:
+      # Server admin account (not used by the apps)
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: kwiga123
+    # host:container — 5433 on your machine so it doesn't clash with a
+    # Postgres installed directly on Windows (which uses 5432)
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Scripts in this folder run once, the first time the volume is empty
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lab_net
+
+networks:
+  # Fixed name so each app's compose file can join it as an external network
+  lab_net:
+    name: lab_net
+
+volumes:
+  postgres_data:

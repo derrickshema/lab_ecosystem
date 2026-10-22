@@ -12,6 +12,17 @@
 
 > *LabLenz gives providers, lab techs, and patients a shared, real-time view of the lab testing pipeline — orders, specimens, results, and alerts — without the paper, phone calls, and manual reconciliation that burden most clinical environments.*
 
+### Place in the lab ecosystem
+
+> **Scope change (Oct 2026):** LabLenz is now one service in a larger ecosystem. See [`docs/architecture/DATA_OWNERSHIP.md`](../../docs/architecture/DATA_OWNERSHIP.md).
+>
+> - **EHR** owns patient registration (MRN), encounters, and provider order entry. LabLenz receives orders from EHR and keeps a read copy of the patient, encounter, and order data it needs.
+> - **LabLenz** owns the test catalog, specimens, lab testing, and results. It sends released results back to EHR.
+> - **Identity / Platform** owns users, facilities, staff access grants, and the platform-level patient identity. LabLenz's current auth module fills this role until it is extracted.
+> - **Patient Portal** is a separate app. Patients use their platform identity to see results across facilities.
+>
+> Sections below marked **→ EHR**, **→ Identity**, or **→ Patient Portal** describe functionality that now lives in that service.
+
 ---
 
 ## 2. Problem Space
@@ -60,21 +71,21 @@ Patient → Encounter → LabOrder → LabOrderItem → Result
                           └──► Specimen → SpecimenStatusHistory
 ```
 
-| Stage | Owner | Meaning |
-|---|---|---|
-| Patient & Encounter | Registration | Who the patient is and the context of the visit |
-| LabOrder + LabOrderItem | Provider / Lab Tech | *Intent* — what tests are requested |
-| Specimen | Lab Tech | *Execution* — the physical sample |
-| Result | Lab Tech | *Outcome* — the measured analyte values |
+| Stage | Owner | Service | Meaning |
+|---|---|---|---|
+| Patient & Encounter | Registration | EHR | Who the patient is and the context of the visit |
+| LabOrder + LabOrderItem | Provider | EHR (copy in LabLenz) | *Intent* — what tests are requested |
+| Specimen | Lab Tech | LabLenz | *Execution* — the physical sample |
+| Result | Lab Tech | LabLenz (copy in EHR) | *Outcome* — the measured analyte values |
 
 ### 4.2 Domains
 
-| Domain | Core entities | Purpose |
-|---|---|---|
-| Clinical | Patient, Encounter, LabOrder | Drives ordering intent |
-| Laboratory | Specimen, LabOrderItem, Result | Tracks execution and outcomes |
-| Catalog | LabTest, Analyte, ClinicalDecisionLimits | Knowledge base for tests and reference ranges |
-| Identity | User, Staff, UserPatientLink | Access, roles, and relationships |
+| Domain | Core entities | Purpose | Owning service |
+|---|---|---|---|
+| Clinical | Patient, Encounter, LabOrder | Drives ordering intent | EHR (LabLenz holds a copy) |
+| Laboratory | Specimen, LabOrderItem, Result | Tracks execution and outcomes | LabLenz |
+| Catalog | LabTest, Analyte, ClinicalDecisionLimits | Knowledge base for tests and reference ranges | LabLenz |
+| Identity | User, Staff, PlatformPatient, patient portal account | Access, roles, and relationships | Identity / Platform |
 
 ### 4.3 Tenancy
 
@@ -84,17 +95,17 @@ Every piece of patient data, every order, every result is scoped to a `facility_
 
 ## 5. User Roles & What They Do
 
-### 5.1 Registration Staff
+### 5.1 Registration Staff — → EHR
 
-Responsible for onboarding patients and creating encounters.
+Works in the EHR portal. Responsible for onboarding patients and creating encounters.
 
 - Register new patients (collect demographics, generate MRN).
 - Create encounters (initial visit or return visit, assign encounter number).
 - Trigger portal invitation email to newly registered patients.
 
-### 5.2 Provider (Physician / Ordering Clinician)
+### 5.2 Provider (Physician / Ordering Clinician) — → EHR
 
-Responsible for ordering tests and acting on results.
+Works in the EHR portal; orders flow to LabLenz and results flow back. Responsible for ordering tests and acting on results.
 
 - Search the test catalog and order one or more tests against an existing patient encounter.
 - Specify desired specimen collection time.
@@ -130,9 +141,9 @@ Global administrator for the LabLenz platform. Operates above the facility level
 - Monitor platform-level health, audit logs, and cross-facility usage.
 - Cannot access patient clinical data within any facility (read access to facility metadata only).
 
-### 5.6 Patient
+### 5.6 Patient — → Patient Portal
 
-End consumer of lab results via the patient portal.
+Logs in with a platform-level identity that links their records across facilities. End consumer of lab results via the patient portal.
 
 - Receive push/email notification when results are released.
 - View lab results with clear visual indicators for out-of-range and critical values.
@@ -142,14 +153,16 @@ End consumer of lab results via the patient portal.
 
 ## 6. Core Feature Set
 
-### 6.1 Patient Registration
+### 6.1 Patient Registration — → EHR
+
+> Registration also links the facility patient record to a platform patient identity (see DATA_OWNERSHIP.md → Patient Identity).
 
 - Form captures: first name, last name, date of birth, sex, contact info.
 - On submission: system generates a unique **MRN** (Medical Record Number).
 - System sends a portal invitation email with a sign-up link.
 - Duplicate detection: warn if a patient with matching name + DOB already exists in the facility.
 
-### 6.2 Encounter Management
+### 6.2 Encounter Management — → EHR
 
 - Create an encounter for a registered patient.
 - Capture: encounter type (initial/follow-up/etc.), floor/unit, provider, date.
@@ -157,7 +170,9 @@ End consumer of lab results via the patient portal.
 - A patient can have multiple encounters over time; each is distinct.
 - Encounter status tracks: `active`, `discharged`, `cancelled`.
 
-### 6.3 Provider Order Entry
+### 6.3 Provider Order Entry — → EHR
+
+> Order entry happens in EHR against LabLenz's catalog; submitted orders are sent to LabLenz. Lab-tech-entered orders (verbal/requisition) are still TBD — decide whether LabLenz creates them via the EHR API.
 
 - Search/browse the test catalog by test name or test code.
 - Select a patient by name, MRN, or encounter number.
@@ -195,7 +210,7 @@ End consumer of lab results via the patient portal.
 - Unacknowledged critical alerts persist and re-notify on a configurable schedule.
 - All acknowledgment events are audit-logged: who acknowledged, when.
 
-### 6.8 Patient Portal
+### 6.8 Patient Portal — → Patient Portal
 
 - After results are released, the patient is notified (in-app + email).
 - Patient logs in and sees a list of their results grouped by encounter.
@@ -241,6 +256,8 @@ Test is LIVE in the facility's catalog
 ## 7. Data Model
 
 ### 7.1 Entity Hierarchy
+
+> Original single-app model. In the ecosystem split, `Patient`, `Encounter`, and `LabOrder` are owned by EHR (LabLenz stores copies keyed by EHR UUIDs). `User`, `Staff`, and `Facility` are owned by Identity. `UserPatientLink` is replaced by the platform patient identity.
 
 ```
 Facility
@@ -333,10 +350,11 @@ Foundation and core loop operational.
 
 - [ ] Auth: registration, login, RBAC, JWT sessions
 - [ ] Multi-tenancy: facility isolation enforced end-to-end
-- [ ] Patient registration + MRN generation + portal invite email
-- [ ] Encounter creation + encounter number generation
+- [ ] ~~Patient registration + MRN generation + portal invite email~~ → EHR
+- [ ] ~~Encounter creation + encounter number generation~~ → EHR
 - [ ] Test catalog (manually created entries)
-- [ ] Provider order entry UI
+- [ ] ~~Provider order entry UI~~ → EHR
+- [ ] Receive orders from EHR; send released results back to EHR
 - [ ] Specimen creation, accession numbering, status tracking
 - [ ] Lab Tech result entry (per analyte) + auto-flagging
 - [ ] Review and release workflow (Results Monitor)
@@ -392,5 +410,5 @@ The MVP is complete when the following end-to-end scenario works without manual 
 
 ---
 
-*Last updated: April 2026*
+*Last updated: October 2026 (ecosystem split)*
 

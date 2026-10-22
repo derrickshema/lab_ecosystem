@@ -1,26 +1,11 @@
-services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:16-alpine
-    container_name: myapp-db
-    environment:
-      POSTGRES_USER: app_user
-      POSTGRES_PASSWORD: app_password
-      POSTGRES_DB: app_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app_user -d app_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+# PostgreSQL is shared across apps and runs from infrastructure/docker-compose.yml.
+# Start that first: it creates ehr_db and the lab_net network.
 
+services:
   # LocalStack — emulates AWS S3 locally (no real AWS account needed)
   localstack:
     image: localstack/localstack:latest
-    container_name: myapp-localstack
+    container_name: ehr-localstack
     environment:
       SERVICES: s3
       AWS_DEFAULT_REGION: us-east-1
@@ -34,13 +19,13 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: myapp-backend
+    container_name: ehr-backend
     environment:
-      # Use the service name 'postgres', not localhost
-      DATABASE_URL: postgresql+psycopg2://app_user:app_password@postgres:5432/app_db
+      # 'postgres' is the shared server, reached over lab_net
+      DATABASE_URL: postgresql+psycopg2://ehr_user:ehr_123@postgres:5432/ehr_db
       SECRET_KEY: your-super-secret-key-change-in-production
       CORS_ORIGINS: '["http://localhost:3000", "http://frontend:3000"]'
-      S3_BUCKET_NAME: myapp-uploads
+      S3_BUCKET_NAME: ehr-uploads
       S3_ENDPOINT_URL: http://localstack:4566
       S3_ACCESS_KEY: test
       S3_SECRET_KEY: test
@@ -50,11 +35,20 @@ services:
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
       RESEND_API_KEY: ${RESEND_API_KEY:-re_placeholder}
       FRONTEND_URL: http://localhost:3000
+      DEBUG: "true"
+    # Mount source so code changes and alembic migrations sync with the host.
+    # The venv lives at /opt/venv, so this mount doesn't hide it.
+    volumes:
+      - ./backend:/app
+    # Hot-reload for development; drop --reload in production
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
+    # default: reach localstack and the frontend; lab_net: reach postgres
+    networks:
+      - default
+      - lab_net
     depends_on:
-      postgres:
-        condition: service_healthy
       localstack:
         condition: service_started
     healthcheck:
@@ -68,7 +62,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: myapp-frontend
+    container_name: ehr-frontend
     environment:
       ORIGIN: http://localhost:3000
       # Internal: SvelteKit server-side code uses the service name
@@ -81,6 +75,10 @@ services:
       backend:
         condition: service_healthy
 
+networks:
+  # Created by infrastructure/docker-compose.yml
+  lab_net:
+    external: true
+
 volumes:
-  postgres_data:
   localstack_data:
