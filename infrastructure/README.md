@@ -7,7 +7,16 @@ One PostgreSQL server shared by every app during local development. Each app has
 | EHR | `ehr_db` | `ehr_user` / `ehr_123` |
 | LabLenz | `lablenz_db` | `lablenz_user` / `lablenz_123` |
 
-Server admin: `postgres` / `postgres`.
+Server admin: user `postgres`, password from `infrastructure/.env`.
+
+## First-time setup
+
+```sh
+cd infrastructure
+cp .env.example .env    # then set POSTGRES_PASSWORD in .env
+```
+
+`.env` is gitignored, so the admin password never reaches the repo. Compose reads it automatically and fills in `${POSTGRES_PASSWORD}` in `docker-compose.yml`.
 
 ## Start
 

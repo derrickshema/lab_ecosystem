@@ -12,9 +12,11 @@ services:
     image: postgres:16-alpine
     container_name: lab-postgres
     environment:
-      # Server admin account (not used by the apps)
+      # Server admin account (not used by the apps).
+      # The password comes from infrastructure/.env (gitignored);
+      # copy .env.example to .env and set it there.
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: kwiga123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in infrastructure/.env}
     # host:container — 5433 on your machine so it doesn't clash with a
     # Postgres installed directly on Windows (which uses 5432)
     ports:
