@@ -61,8 +61,8 @@ services:
       # Database connection ('postgres' is the shared server, reached over lab_net)
       DATABASE_URL: postgresql://lablenz_user:lablenz_123@postgres:5432/lablenz_db
       
-      # Security (use a real secret in production!)
-      SECRET_KEY: your-super-secret-key-change-in-production
+      # Identity's public keys, over lab_net ('identity' is its alias there)
+      IDENTITY_JWKS_URL: http://identity:8000/.well-known/jwks.json
       
       # CORS - allow frontend origin
       CORS_ORIGINS: '["http://localhost:3001", "http://frontend:3000"]'
@@ -78,9 +78,6 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
-      
-      # Email (set these in .env for real values)
-      RESEND_API_KEY: ${RESEND_API_KEY:-re_placeholder}
       
       # Frontend URL for email links
       FRONTEND_URL: http://localhost:3001

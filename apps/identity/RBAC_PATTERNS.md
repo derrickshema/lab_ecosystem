@@ -2,6 +2,8 @@
 
 > Living document — built from real implementation. Add to this as new patterns are established.
 
+> **Moved from LabLenz.** These guards live on in `apps/identity` (`app/dependencies/`). Every other app uses the token-only equivalents in `labcore.auth`: `auth.require_org_role(...)` and `auth.require_system_role(...)`, which return `AccessClaims` instead of a `User`. IDs are UUIDs.
+
 ---
 
 ## Concept: Two Role Layers

@@ -2,6 +2,11 @@
 
 > Living document — built from real implementation. Add to this as new patterns are established.
 
+> **Moved from LabLenz.** This was written for LabLenz's original auth. What has changed in `apps/identity`:
+> - **RS256, not HS256:** tokens are signed with a private key (`keys/jwt_private.pem`) and verified with the public key, which is published at `/.well-known/jwks.json`. There is no shared `SECRET_KEY`.
+> - **UUID IDs, not integers.** The user ID travels in the standard `sub` claim. Tokens also carry `iss` and a `kid` header.
+> - **Other apps verify tokens with `labcore.auth.Auth`** (see `packages/labcore`), not with their own `security/jwt.py`.
+
 ---
 
 ## Stack

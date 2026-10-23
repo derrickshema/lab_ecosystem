@@ -58,27 +58,14 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     
     # =========================================================================
-    # Security / JWT Configuration
+    # Authentication (tokens issued by apps/identity)
     # =========================================================================
-    # Required: Secret key for signing JWT tokens
-    # Generate with: openssl rand -hex 32
-    # IMPORTANT: Use a different value in production!
-    SECRET_KEY: str
-    
-    # JWT algorithm (don't change unless you know what you're doing)
-    ALGORITHM: str = "HS256"
-    
-    # How long access tokens are valid (in minutes)
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-
-    # How long refresh tokens are valid (in minutes) — default 7 days
-    REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
-
-    # How long password reset tokens are valid (in minutes)
-    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30
-
-    # How long email verification tokens are valid (in minutes) — default 24 hours
-    EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    # LabLenz doesn't log anyone in; it verifies Identity's tokens with the
+    # public keys published here.
+    # From .venv: localhost:8002. Inside Docker: identity:8000 (over lab_net).
+    IDENTITY_JWKS_URL: str = "http://localhost:8002/.well-known/jwks.json"
+    # Must match Identity's JWT_ISSUER; tokens from any other issuer are rejected
+    IDENTITY_ISSUER: str = "lab-identity"
     
     # =========================================================================
     # Application Settings
@@ -94,14 +81,6 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:5173"
     
     # =========================================================================
-    # Superadmin (Initial Setup)
-    # =========================================================================
-    # These are used to create the initial superadmin account
-    SUPERADMIN_USERNAME: str = "admin"
-    SUPERADMIN_PASSWORD: str = "changeme"  # Change in production!
-    SUPERADMIN_EMAIL: str = "admin@example.com"
-    
-    # =========================================================================
     # S3 / File Storage Configuration
     # =========================================================================
     # For local development, we use LocalStack (fake AWS)
@@ -112,13 +91,6 @@ class Settings(BaseSettings):
     AWS_ACCESS_KEY_ID: str = "test"  # LocalStack doesn't check these
     AWS_SECRET_ACCESS_KEY: str = "test"
     AWS_REGION: str = "us-east-1"
-    
-    # =========================================================================
-    # Email Configuration (Resend)
-    # =========================================================================
-    # Get your API key from https://resend.com/api-keys
-    RESEND_API_KEY: str | None = None  # Optional for local dev
-    FROM_EMAIL: str = "onboarding@resend.dev"
     
     # =========================================================================
     # Payment Configuration (Stripe)

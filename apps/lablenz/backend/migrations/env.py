@@ -6,10 +6,8 @@ from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 from alembic import context
 
-# Must import all models so SQLModel registers their tables in metadata
-from app.models.enums import SystemRole, OrgRole  # noqa: F401
-from app.models.user import User  # noqa: F401
-from app.models.facility import Facility, UserFacility  # noqa: F401
+# Must import all models so SQLModel registers their tables in metadata.
+# Add each new model module here. (Users and facilities live in apps/identity.)
 
 load_dotenv()
 
