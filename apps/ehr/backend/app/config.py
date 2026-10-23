@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     # =========================================================================
+    # Authentication (tokens issued by apps/identity)
+    # =========================================================================
+    # Where to fetch Identity's public signing keys.
+    # From .venv: localhost:8002. Inside Docker: identity:8000 (over lab_net).
+    IDENTITY_JWKS_URL: str = "http://localhost:8002/.well-known/jwks.json"
+    # Must match Identity's JWT_ISSUER; tokens from any other issuer are rejected
+    IDENTITY_ISSUER: str = "lab-identity"
+
+    # =========================================================================
     # Application Settings
     # =========================================================================
     # "development" or "production"
@@ -43,7 +52,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore",  # Ignore env vars not defined here (e.g. SECRET_KEY for now)
+        extra="ignore",  # Ignore env vars not defined here
     )
 
 

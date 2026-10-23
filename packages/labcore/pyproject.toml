@@ -5,10 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "labcore"
 version = "0.1.0"
-description = "Shared backend code for the lab ecosystem apps (database, and later auth verification)"
+description = "Shared backend code for the lab ecosystem apps (database, roles, token verification)"
 requires-python = ">=3.13"
 dependencies = [
     "sqlmodel>=0.0.38",
+    "fastapi>=0.110",
+    "pyjwt[crypto]>=2.9",
 ]
 
 [tool.setuptools.packages.find]

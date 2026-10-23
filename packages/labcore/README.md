@@ -1,6 +1,14 @@
 # labcore
 
-Shared Python code for the ecosystem's backends. Currently: database engine and session helpers (`labcore.db`).
+Shared Python code for the ecosystem's backends:
+
+| Module | What it does |
+|---|---|
+| `labcore.db` | `make_engine()` and `make_session_dependency()`: the connection pool and per-request session |
+| `labcore.roles` | `SystemRole` and `OrgRole`, the one role list every app uses |
+| `labcore.auth` | `Auth`: verifies access tokens from `apps/identity` with its public key (JWKS), plus FastAPI guards `current_claims`, `require_org_role(...)` and `require_system_role(...)` |
+
+Apps wire these up in `app/db.py` and `app/auth.py`. Each app sets `IDENTITY_JWKS_URL`: `http://localhost:8002/...` from a `.venv`, or `http://identity:8000/...` inside Docker.
 
 ## Installing into an app
 

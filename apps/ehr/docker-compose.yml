@@ -24,7 +24,8 @@ services:
     environment:
       # 'postgres' is the shared server, reached over lab_net
       DATABASE_URL: postgresql+psycopg2://ehr_user:ehr_123@postgres:5432/ehr_db
-      SECRET_KEY: your-super-secret-key-change-in-production
+      # Identity's public keys, over lab_net ('identity' is its alias there)
+      IDENTITY_JWKS_URL: http://identity:8000/.well-known/jwks.json
       CORS_ORIGINS: '["http://localhost:3000", "http://frontend:3000"]'
       S3_BUCKET_NAME: ehr-uploads
       S3_ENDPOINT_URL: http://localstack:4566
