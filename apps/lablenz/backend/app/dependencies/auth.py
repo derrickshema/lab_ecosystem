@@ -91,6 +91,6 @@ async def get_current_user(
 
 
 async def get_verified_user(current_user: User = Depends(get_current_user)) -> User:
-    if not current_user.email_verified:
+    if not current_user.account_active:
         raise HTTPException(403, "Email address not verified")
     return current_user

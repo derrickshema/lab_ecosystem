@@ -30,7 +30,7 @@ get_token_data(token)            ← JWT decoded ONCE; FastAPI caches result per
 get_current_user   require_org_role._guard   (reads token_data.org_role — no extra DB query)
 (DB lookup)
      ↓
-get_verified_user  (checks email_verified)
+get_verified_user  (checks account_active)
 ```
 
 **Key insight:** `get_token_data` is a regular FastAPI dependency. When multiple guards (`get_current_user` + `require_org_role`) both depend on it, FastAPI resolves it once and injects the cached result into both. The JWT is never decoded more than once per request.
@@ -146,7 +146,7 @@ Some sensitive operations (profile changes, tenant access) require a verified em
 
 ```python
 async def get_verified_user(current_user: User = Depends(get_current_user)) -> User:
-    if not current_user.email_verified:
+    if not current_user.account_active:
         raise HTTPException(status_code=403, detail="Email address not verified")
     return current_user
 ```

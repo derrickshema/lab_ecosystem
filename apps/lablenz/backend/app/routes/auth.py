@@ -332,7 +332,7 @@ def send_email_verification(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if user.email_verified:
+    if user.account_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email address is already verified",
@@ -366,10 +366,10 @@ def confirm_email_verification(
             detail="Invalid or expired email verification token",
         )
 
-    if user.email_verified:
+    if user.account_active:
         return {"message": "Email address is already verified."}
 
-    user.email_verified = True
+    user.account_active = True
     session.add(user)
     session.commit()
     return {"message": "Email address verified successfully."}

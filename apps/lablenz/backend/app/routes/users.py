@@ -79,7 +79,7 @@ def update_me(
                 detail="Email already registered",
             )
         # Email changed — require re-verification
-        update_data["email_verified"] = False
+        update_data["account_active"] = False
 
     for field, value in update_data.items():
         setattr(current_user, field, value)
