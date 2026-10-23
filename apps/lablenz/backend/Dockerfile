@@ -42,11 +42,17 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy only requirements.txt first (not the whole app)
 # Docker caches each layer, so if requirements.txt doesn't change,
 # Docker reuses the cached layer (faster rebuilds!)
-COPY requirements.txt .
-
+# Build context is the repo root (see docker-compose.yml), so paths
+# below are relative to it.
+COPY apps/lablenz/backend/requirements.txt .
 # Install Python dependencies into the virtual environment
 # --no-cache-dir: Don't store pip's cache (smaller image)
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Shared package, installed editable so the dev bind mount of
+# packages/labcore (docker-compose.yml) hot-reloads in the container
+COPY packages/labcore /packages/labcore
+RUN pip install --no-cache-dir -e /packages/labcore
 
 # ------------------------------------------------------------
 # STAGE 2: Runtime (Final Image)
@@ -67,6 +73,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy the virtual environment from the builder stage
 # This is the magic of multi-stage builds!
 COPY --from=builder /opt/venv /opt/venv
+# The editable install points here, so it must exist at runtime too
+COPY --from=builder /packages /packages
 
 # Add venv to PATH
 ENV PATH="/opt/venv/bin:$PATH"
@@ -79,7 +87,7 @@ ENV PYTHONUNBUFFERED=1
 
 # Copy the application code
 # The .dockerignore file controls what gets copied
-COPY . .
+COPY apps/lablenz/backend/ .
 
 # Expose port 8000 (documentation for humans, doesn't actually open the port)
 # The actual port mapping happens in docker-compose.yml

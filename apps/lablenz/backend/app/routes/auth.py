@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlmodel import Session, select
 
 from ..config import settings
-from ..db.session import get_session
+from ..db import get_session
 from ..dependencies.auth import COOKIE_NAME, get_token_data
 from ..integrations.email import send_password_reset_email, send_verification_email
 from ..models.auth import (

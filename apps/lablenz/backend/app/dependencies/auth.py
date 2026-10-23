@@ -8,7 +8,7 @@ It extracts and validates JWT tokens from cookies or headers.
 from fastapi import Depends, HTTPException, status, Request
 from sqlmodel import Session
 
-from ..db.session import get_session
+from ..db import get_session
 from ..models.auth import TokenData
 from ..models.user import User
 from ..security.jwt import decode_access_token

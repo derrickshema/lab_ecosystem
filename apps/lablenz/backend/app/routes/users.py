@@ -14,7 +14,7 @@ Endpoints:
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
-from ..db.session import get_session
+from ..db import get_session
 from ..dependencies.auth import get_current_user, get_verified_user
 from ..dependencies.rbac import get_superadmin
 from ..models.facility import UserFacility

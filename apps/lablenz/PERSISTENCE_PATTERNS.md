@@ -11,16 +11,31 @@
 
 ---
 
-## Engine Configuration (`db/database.py`)
+## Where this code lives
+
+The engine and session code is shared by every app in `packages/labcore/labcore/db.py`. Each app wires it up in a 3-line `app/db.py`:
+
+```python
+from labcore.db import make_engine, make_session_dependency
+from .config import settings
+
+engine = make_engine(settings.DATABASE_URL, echo=settings.DEBUG)
+get_session = make_session_dependency(engine)
+```
+
+The snippets below show what `labcore` does inside.
+
+---
+
+## Engine Configuration (`labcore.db.make_engine`)
 
 ### Always configure the connection pool explicitly
 ```python
 from sqlmodel import create_engine
-from app.config import settings
 
 engine = create_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
+    database_url,
+    echo=echo,
     pool_pre_ping=True,   # test connections before use — prevents stale connection errors
     pool_size=5,          # persistent connections kept open
     max_overflow=10,      # extra connections allowed above pool_size under load
@@ -45,14 +60,13 @@ Without this, stale connections from the pool (after a DB restart, cloud DB time
 
 ---
 
-## Session Management (`db/session.py`)
+## Session Management (`labcore.db.make_session_dependency`)
 
 ### Auto-commit pattern (recommended)
 ```python
 from sqlmodel import Session
-from .database import engine
 
-def get_session():
+def get_session():  # built per app, bound to that app's engine
     with Session(engine) as session:
         try:
             yield session
@@ -84,7 +98,7 @@ Gives finer control but adds boilerplate to every write route. Prefer the auto-c
 ```python
 from fastapi import Depends
 from sqlmodel import Session, select
-from app.db.session import get_session
+from app.db import get_session
 
 @router.get("/items")
 def get_items(session: Session = Depends(get_session)):

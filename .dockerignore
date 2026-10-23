@@ -1,0 +1,18 @@
+# Backend images are built with the repo root as context (so they can copy
+# packages/labcore). Send nothing by default, then allow only what's needed.
+*
+!packages/
+!apps/*/backend/
+
+# ...and never send these, even inside the allowed folders
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+**/.env
+**/.env.*
+**/.pytest_cache/
+**/tests/
+**/*.egg-info/
+**/*.md
+**/*.log

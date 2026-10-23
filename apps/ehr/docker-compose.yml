@@ -17,8 +17,9 @@ services:
   # Backend (FastAPI)
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      # Repo root, so the Dockerfile can also copy packages/labcore
+      context: ../..
+      dockerfile: apps/ehr/backend/Dockerfile
     container_name: ehr-backend
     environment:
       # 'postgres' is the shared server, reached over lab_net
@@ -40,8 +41,10 @@ services:
     # The venv lives at /opt/venv, so this mount doesn't hide it.
     volumes:
       - ./backend:/app
+      # Shared package: edits on the host hot-reload in the container
+      - ../../packages/labcore:/packages/labcore
     # Hot-reload for development; drop --reload in production
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app --reload-dir /packages/labcore
     ports:
       - "8000:8000"
     # default: reach localstack and the frontend; lab_net: reach postgres
