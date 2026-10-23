@@ -6,6 +6,7 @@ One PostgreSQL server shared by every app during local development. Each app has
 |---|---|---|
 | EHR | `ehr_db` | `ehr_user` / `ehr_123` |
 | LabLenz | `lablenz_db` | `lablenz_user` / `lablenz_123` |
+| Identity | `identity_db` | `identity_user` / `identity_123` |
 
 Server admin: user `postgres`, password from `infrastructure/.env`.
 

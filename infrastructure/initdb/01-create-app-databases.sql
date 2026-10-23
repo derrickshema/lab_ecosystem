@@ -13,3 +13,8 @@ REVOKE CONNECT ON DATABASE ehr_db FROM PUBLIC;
 CREATE USER lablenz_user WITH PASSWORD 'lablenz_123';
 CREATE DATABASE lablenz_db OWNER lablenz_user;
 REVOKE CONNECT ON DATABASE lablenz_db FROM PUBLIC;
+
+-- Identity (consolidated auth: users, facilities, role grants)
+CREATE USER identity_user WITH PASSWORD 'identity_123';
+CREATE DATABASE identity_db OWNER identity_user;
+REVOKE CONNECT ON DATABASE identity_db FROM PUBLIC;

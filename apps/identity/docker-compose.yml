@@ -1,0 +1,47 @@
+# Identity: consolidated auth for every app (users, facilities, role grants).
+# PostgreSQL is shared across apps and runs from infrastructure/docker-compose.yml.
+# Start that first: it creates identity_db and the lab_net network.
+
+services:
+  backend:
+    build:
+      # Repo root, so the Dockerfile can also copy packages/labcore
+      context: ../..
+      dockerfile: apps/identity/backend/Dockerfile
+    container_name: identity-backend
+    environment:
+      # 'postgres' is the shared server, reached over lab_net
+      DATABASE_URL: postgresql+psycopg2://identity_user:identity_123@postgres:5432/identity_db
+      # Keys come from the bind-mounted backend/keys/ (never baked into the image).
+      # Generate them first: python -m scripts.generate_jwt_keys
+      JWT_PRIVATE_KEY_PATH: /app/keys/jwt_private.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/jwt_public.pem
+      FRONTEND_URL: http://localhost:5173
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      DEBUG: "true"
+    # Mount source so code changes and alembic migrations sync with the host.
+    # The venv lives at /opt/venv, so this mount doesn't hide it.
+    volumes:
+      - ./backend:/app
+      # Shared package: edits on the host hot-reload in the container
+      - ../../packages/labcore:/packages/labcore
+    # Hot-reload for development; drop --reload in production
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app --reload-dir /packages/labcore
+    ports:
+      - "8002:8000"
+    # lab_net: reach postgres, and be reachable by other apps as 'identity'
+    networks:
+      default:
+      lab_net:
+        aliases:
+          - identity
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  # Created by infrastructure/docker-compose.yml
+  lab_net:
+    external: true
